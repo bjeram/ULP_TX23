@@ -140,16 +140,15 @@ wait01:  stage_inc  1
 	/* wait another 1.2ms */
 	wait    9800
 	/* GPIO_read r0 holds input result */
-	/* wait(3760)  470us */
 	/* 16mSec  */
     wait 65535 /* 8ms*/
 	wait 65535
 	
-wait_for_high: 
+wait_data_start: 
 	wait 800
 	GPIO_read
 	and r0, r0, 1
-	jump wait_for_high, eq
+	jump wait_data_start, eq
 
 	ret
 	
@@ -188,7 +187,7 @@ get_values:
 	pop r0
 	st r2, r0, 0
 	add r0, r0, 1
-
+ret
 	push r0
 	psr
     jump read_12bits
@@ -222,27 +221,34 @@ get_values:
 
 /* R2: (5bits) read_byte stores in R2 on return. */
 read_5bits:
-	/*
-	psr
-	jump read_bit
-	move r2, r0
-	wait(120)  15 us 
-	move r0, 1
-	*/
-	move r2, 0
-	move r0, 0
+	
+	move r2, 0  /* read-out data (bits) */ 
+	move r0, 0  /* bit index */
+	move r1, 0 
+
+	/* in next two stes we are assuming that first read is 1 = bit is 1*/
+	move r2, 1  /* read-out data (bits) */ /* first value is always 1 TBC*/
+	move r0, 1  /* bit index  as first bit is already read*/
+	move r1, 1 /* previos bit value is always 1 TBC */
+	
 
 read_5bits_loop:
 	push r0
+
+	/* put previos value to r0 */
+	move r0, r1
 	psr
-	jump read_bit
+	jump read_wait
+/*	jump read_bit */
 	move r1, r0
 	pop r0
 
+	push r1 /* store current (previos) bit value*/
 	lsh r1, r1, r0
 	or r2, r2, r1
+	pop r1
 
-	wait 9750 /* 1200us */
+	/* wait 9750 *//* 1200us */
 	add r0, r0, 1
 	jumpr read_5bits_loop, 5, LT
 
@@ -250,28 +256,29 @@ read_5bits_loop:
 
 /* R2: (4bits) read_byte stores in R2 on return. */
 read_4bits:
-	/*
-	psr
-	jump read_bit
-	move r2, r0
-	wait(120)  15 us 
-	move r0, 1
-	*/
+	
 	move r2, 0
 	move r0, 0
 
+	/* in next two stes we are assuming that first read is 1 = bit is 1*/
+	/* previos value must bwe 11011 */
+	move r1, 1 /* previos bit value is always 1 TBC */
 read_4bits_loop:
 	push r0
+	/* put previos value to r0 */
+	move r0, r1
 	psr
-	jump read_bit
+	jump read_wait
+	/* jump read_bit */
 	move r1, r0
 	pop r0
 
+	push r1 /* store current (previos) bit value*/
 	lsh r1, r1, r0
 	or r2, r2, r1
+	pop r1
 
-	/* wait(120)  15 us */
-	wait 9750 /* 1.2ms */
+	/* wait 9750 *//* 1.2ms */
 	add r0, r0, 1
 	jumpr read_4bits_loop, 4, LT
 
@@ -309,19 +316,42 @@ read_12bits_loop:
 /* R0: (1bit) stores GPIO input on return. */
 /* since R2 is used to store all the bits */
 read_bit:
-/*
-	GPIO_L
-	GPIO_low
-	*/
-	/* wait(16)  2 us */
-/*
-	GPIO_high
-	*/
-	/* wait(120)  15 us */
 	GPIO_H
 	GPIO_read 
 	
 	ret
+
+
+/* reads next bit eather value cahnged, or timer (1.2ms) */
+/* R0: (1bit) stores GPIO input on return. */
+/* r0 should contain previos value = bit*/
+/* since R2 is used to store all the bits */
+read_wait:
+
+		stage_rst
+		jumpr wait_for_low, 1, GE /* EQ does not work ??? */
+
+wait_for_high:
+		wait 800 /* 100us*/
+		GPIO_H /* do we actaully need this ?? */
+		GPIO_read 
+		jumpr edge_read, 1, GE
+		stage_inc  1          
+        jumps wait_for_high, 12, LT   /*  12 * 100us = 1.2ms */
+		ret /* value is in r0 */
+
+wait_for_low:
+		wait 800 /* 100us*/
+		GPIO_H /* do we actaully need this ?? */
+		GPIO_read 
+		jumpr edge_read, 1, LT
+		stage_inc  1          
+        jumps wait_for_low, 12, LT   /*  12 * 100us = 1.2ms */
+		ret /* value is in r0 */
+
+edge_read:
+		wait 4800 /* 600us  to get mid of the bit */
+		ret
 
 
 delay_ms:
