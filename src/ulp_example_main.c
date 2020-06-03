@@ -21,7 +21,7 @@
 #include "ulp_main.h"
 
 RTC_DATA_ATTR static int counter; 
-
+ 
 extern const uint8_t ulp_main_bin_start[] asm("_binary_ulp_main_bin_start");
 extern const uint8_t ulp_main_bin_end[]   asm("_binary_ulp_main_bin_end");
 
@@ -39,28 +39,16 @@ void app_main()
 	counter++;
     printf("<<<<<< Result: %d >>>>>>\n",counter);
 
-    printf("%04x\n", ulp_scratchpad_memory& UINT16_MAX);
-    printf("----- Temperature in C ----- %04x\n", ulp_temperatureC  );
-    printf("---- Extra_Hold --------- 0x%x\n", ulp_temperatureC & UINT16_MAX);
-    printf("%04x\n", *(&ulp_scratchpad_memory+1)& UINT16_MAX);
-    printf("%04x\n", *(&ulp_scratchpad_memory+2)& UINT16_MAX);
+    printf("Header: 0x%x\n", ulp_data_header & UINT16_MAX);
+    printf("Wind Direction: 0x%x\n", ulp_wind_direction & UINT16_MAX);
+//    printf("----- Temperature in C ----- %04x\n", ulp_temperatureC  );
+//    printf("---- Extra_Hold --------- 0x%x\n", ulp_temperatureC & UINT16_MAX);
+//    printf("%04x\n", *(&ulp_scratchpad_memory+1)& UINT16_MAX);  // wind direction
+    printf("Wind speed %04x\n", *(&ulp_scratchpad_memory+2)& UINT16_MAX);
     printf("%04x\n", *(&ulp_scratchpad_memory+3)& UINT16_MAX);
     printf("%04x\n", *(&ulp_scratchpad_memory+4)& UINT16_MAX);
     printf("%04x\n", *(&ulp_scratchpad_memory+5)& UINT16_MAX);
 
-    /*
-	float temperatureC = 0.0;
-	float temperatureF = 0.0;
-	temperatureC = ulp_temperatureC & UINT16_MAX;
-	temperatureF = ulp_temperatureF & UINT16_MAX;
-	
-	//printf("---- Extra_Hold --------- 0x%x\n", ulp_temperatureC & UINT16_MAX);
-	printf("----- Temperature in C ----- %.2f\n", temperatureC /16 );
-	printf("----- Temperature in F ----- %.2f\n", (temperatureF /16) *1.8 +32);
-	printf("----- CRC8 Scratchpad value ---- 0x%x\n", ulp_crc8_value & UINT16_MAX);
-	printf("----- CRC8 Checked result ---- 0x%x\n", ulp_crc8_check & UINT16_MAX);
-    */
-	//return;
     }
 
     printf("Entering deep sleep\n\n");

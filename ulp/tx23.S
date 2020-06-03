@@ -41,12 +41,12 @@ stack:
 stackEnd:
 	.long 0
 
-	.global temperatureC
-temperatureC:
+	.global data_header
+data_header:
 	.long 0
 	
-	.global temperatureF
-temperatureF:
+	.global wind_direction
+wind_direction:
 	.long 0
 
 	.global crc8_check
@@ -81,13 +81,8 @@ entry:
 /* R2 is free to use: Here, R2 is either used as passing para or as a return var. */
 
 	move r3, stackEnd
-
-	/* disable hold on gpio 15 (data pin) looks like it is not needed */
-//  WRITE_RTC_REG(RTC_IO_TOUCH_PAD3_REG, RTC_IO_TOUCH_PAD3_HOLD_S, 1, 0) 
-
 	psr
 	jump get_values 
-
 
 /*
 	move r1, temperatureC
@@ -125,10 +120,10 @@ rst_pulse:
 	/* So, 500us delay = 500/0.125 => 4,000 cpu cycles. */
 	/* wait 500 microsecond, 1000 ms = 1 millisecon */
 	GPIO_low
-	 /* wait 500 ms */
+	 /* keep it low for 500 ms */
 	stage_rst                  
 wait01:  stage_inc  1          
-    wait 65535 /* 8ms*/
+    wait 65535 /* ~8ms*/
 	wait 65535
 	wait 65535
     jumps wait01, 21, LT   
@@ -141,7 +136,7 @@ wait01:  stage_inc  1
 	/* 16mSec  */
     wait 65535 /* 8ms*/
 	wait 65535
-	
+	/* and wait for HIGH*/
 wait_data_start: 
 	wait 800
 	GPIO_read
@@ -173,7 +168,7 @@ get_values:
 	pop r0
 	st r2, r0, 0
 /****/	
-	move r0, temperatureC
+	move r0, data_header
     st r2, r0, 0
 	move r0, scratchpad_memory
 /****/
@@ -184,7 +179,14 @@ get_values:
     jump read_4bits
 	pop r0
 	st r2, r0, 0
-	add r0, r0, 1
+//	add r0, r0, 1
+/****/	
+	move r0, wind_direction
+    st r2, r0, 0
+	move r0, scratchpad_memory
+	add r0, r0, 2
+/****/
+
 ret
 	push r0
 	psr
@@ -314,7 +316,6 @@ read_12bits_loop:
 /* R0: (1bit) stores GPIO input on return. */
 /* since R2 is used to store all the bits */
 read_bit:
-	GPIO_H
 	GPIO_read 
 	
 	ret
@@ -331,7 +332,6 @@ read_wait:
 
 wait_for_high:
 		wait 800 /* 100us*/
-//		GPIO_H /* do we actaully need this ?? */
 		GPIO_read 
 		jumpr edge_read, 1, GE
 		stage_inc  1          
@@ -340,7 +340,6 @@ wait_for_high:
 
 wait_for_low:
 		wait 800 /* 100us*/
-//		GPIO_H /* do we actaully need this ?? */
 		GPIO_read 
 		jumpr edge_read, 1, LT
 		stage_inc  1          
