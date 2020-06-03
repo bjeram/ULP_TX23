@@ -82,8 +82,8 @@ entry:
 
 	move r3, stackEnd
 
-	/* disable hold on gpio 15 (data pin) */
-    WRITE_RTC_REG(RTC_IO_TOUCH_PAD3_REG, RTC_IO_TOUCH_PAD3_HOLD_S, 1, 0)
+	/* disable hold on gpio 15 (data pin) looks like it is not needed */
+//  WRITE_RTC_REG(RTC_IO_TOUCH_PAD3_REG, RTC_IO_TOUCH_PAD3_HOLD_S, 1, 0) 
 
 	psr
 	jump get_values 
@@ -116,8 +116,6 @@ exit_wake:
         /* Stop the wakeup timer so it does not restart ULP */
         /* WRITE_RTC_FIELD(RTC_CNTL_STATE0_REG, RTC_CNTL_ULP_CP_SLP_TIMER_EN, 0) */
         halt
-
-
 
 
 rst_pulse:
@@ -333,7 +331,7 @@ read_wait:
 
 wait_for_high:
 		wait 800 /* 100us*/
-		GPIO_H /* do we actaully need this ?? */
+//		GPIO_H /* do we actaully need this ?? */
 		GPIO_read 
 		jumpr edge_read, 1, GE
 		stage_inc  1          
@@ -342,7 +340,7 @@ wait_for_high:
 
 wait_for_low:
 		wait 800 /* 100us*/
-		GPIO_H /* do we actaully need this ?? */
+//		GPIO_H /* do we actaully need this ?? */
 		GPIO_read 
 		jumpr edge_read, 1, LT
 		stage_inc  1          
