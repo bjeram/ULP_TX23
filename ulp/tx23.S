@@ -56,6 +56,10 @@ crc8_check:
 crc8_value:
 	.long 0
 	
+	.global err
+err:
+	.long 0
+
 	.global scratchpad_memory
 scratchpad_memory:	// Return 9 Bytes of data after an 0xBE command.
 	.long 0		// Byte 0: Temperature LSB
@@ -137,14 +141,23 @@ wait01:  stage_inc  1
     wait 65535 /* 8ms*/
 	wait 65535
 	/* and wait for HIGH*/
+	stage_rst
 wait_data_start: 
-	wait 800
+	stage_inc 1
+	jumps err_timeout1, 200, GT /* 2s*/
+	wait 800 /* 100us */
 	GPIO_read
 	and r0, r0, 1
 	jump wait_data_start, eq
 
 	ret
-	
+
+err_timeout1:
+	move r0, 0x1
+	move r0, err
+    st r2, r0, 0
+
+	ret
 /* R0 - (16bit) temperature is store in R0 on return. */
 /* This work with one device on the bus, for multiple devicse you should send ROM-ID after rst_pulse */
 get_values:
