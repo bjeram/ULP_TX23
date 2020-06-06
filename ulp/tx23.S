@@ -88,17 +88,6 @@ entry:
 	psr
 	jump get_values 
 
-/*
-	move r1, temperatureC
-	st r0, r1, 0
-
-	psr 
-	jump get_values
-
-	move r1, temperatureF
-	st r0, r1, 0
-*/
-
 	jump exit_wake 
 
 exit:
@@ -157,79 +146,73 @@ err_timeout1:
 	move r0, err
     st r2, r0, 0
 
-	ret
-/* R0 - (16bit) temperature is store in R0 on return. */
-/* This work with one device on the bus, for multiple devicse you should send ROM-ID after rst_pulse */
+	jump exit_wake 
+
 get_values:
 	psr
 	jump rst_pulse
+		
+	wait 4900 /* 600us  to get ot the mid of bit/pulse*/
 	
-	/* delay 750ms, looping 750x in delay_ms */
-	/* 0x44 convert command: convertion is slow, 750 milliseconds */
-	/*psr
-	jump delay_ms
-	*/
-	
-	wait 4800 /* 600us */
-	/* read 9 bytes from scratchpad memory,*/
+	/* 9 bytes from scratchpad memory,*/
 	stage_rst
 	move r0, scratchpad_memory
 
 	push r0
+	move r2, 1 // previous bit is 1 (rst_pulse)
 	psr
-    jump read_5bits
+    jump read_4bits
 	pop r0
+	or r2, r2, 0x10 // as we have read the first of 5 bits in rst_pulse
 	st r2, r0, 0
+
+	
 /****/	
 	move r0, data_header
     st r2, r0, 0
 	move r0, scratchpad_memory
 /****/
 	add r0, r0, 1
-
+/* let's read wind direction and speed (16bits) */
 	push r0
+	move r2, 1 /* previous bit value should be always 1 (11011) for read_16bits*/
 	psr
-    jump read_4bits
+    jump read_16bits
 	pop r0
-	st r2, r0, 0
+	st r2, r0, 0 /* write to scratchpad_memory */
 //	add r0, r0, 1
 /****/	
 	move r0, wind_direction
+	and r2, r2, 0xF
     st r2, r0, 0
+
 	move r0, scratchpad_memory
 	add r0, r0, 2
 /****/
 
-ret
+/* CRC */ 
 	push r0
-	psr
-    jump read_12bits
-	pop r0
-	st r2, r0, 0
-	add r0, r0, 1
-
-	push r0
+	// set previos bit from previos value
+	rsh r2, r2, 15
+	and r2, r2, 0x1
+	//move r2, 0 /* for testin/prototyping previos bit value is set to 0 TBC for read_4bits*/
 	psr
     jump read_4bits
 	pop r0
-	st r2, r0, 0
+	st r2, r0, 0 /* store CRC */
 	add r0, r0, 1
 
+/* wind and speed but in different format, but still 16 bits*/
+// not right result as previos value is not set (r1) !!!!
 	push r0
+	rsh r2, r2, 3
+	and r2, r2, 0x1
+//	move r2, 0 /* for testin/prototyping previos bit value is set to 0 TBC */
 	psr
-    jump read_4bits
+    jump read_16bits
 	pop r0
-	st r2, r0, 0
-	add r0, r0, 1
+	st r2, r0, 0 /* store */
 	
-
-	push r0
-	psr
-    jump read_12bits
-	pop r0
-	st r2, r0, 0
-	add r0, r0, 1
-
 	ret 
 
 /* R2: (5bits) read_byte stores in R2 on return. */
@@ -267,15 +250,13 @@ read_5bits_loop:
 
 	ret
 
-/* R2: (4bits) read_byte stores in R2 on return. */
+/* R2 should containe previos bit version
+(4bits) read_byte stores in R2 on return. */
 read_4bits:
-	
+	move r1, r2
+
 	move r2, 0
 	move r0, 0
-
-	/* in next two stes we are assuming that first read is 1 = bit is 1*/
-	/* previos value must bwe 11011 */
-	move r1, 1 /* previos bit value is always 1 TBC */
 read_4bits_loop:
 	push r0
 	/* put previos value to r0 */
@@ -297,40 +278,34 @@ read_4bits_loop:
 
 	ret
 
-/* R2: (12bits) read_byte stores in R2 on return. */
-read_12bits:
-	/*
-	psr
-	jump read_bit
-	move r2, r0
-	wait(120)  15 us 
-	move r0, 1
-	*/
+
+/* R2 should contain previos bit 
+(16bits) read_byte stores in R2 on return. */
+read_16bits:
+	move r1, r2 // previos bit to r1
+
 	move r2, 0
 	move r0, 0
 
-read_12bits_loop:
+read_16bits_loop:
 	push r0
+	/* put previos value to r0 */
+	move r0, r1
 	psr
-	jump read_bit
+	jump read_wait
+	/* jump read_bit */
 	move r1, r0
 	pop r0
 
+	push r1 /* store current (previos) bit value*/
 	lsh r1, r1, r0
 	or r2, r2, r1
+	pop r1
 
-	/* wait(120)  15 us */
-	wait 9750 /* 1.2ms */
+	/* wait 9750 *//* 1.2ms */
 	add r0, r0, 1
-	jumpr read_12bits_loop, 12, LT
+	jumpr read_16bits_loop, 16, LT
 
-	ret
-
-/* R0: (1bit) stores GPIO input on return. */
-/* since R2 is used to store all the bits */
-read_bit:
-	GPIO_read 
-	
 	ret
 
 
@@ -362,16 +337,4 @@ wait_for_low:
 edge_read:
 		wait 4800 /* 600us  to get mid of the bit */
 		ret
-
-
-delay_ms:
-	/* delay 750 mill sec, wait 0.75 sec, 1000 millisecond = 1 second */
-	/* 1ms = 1,000 us */
-	move r0, 750
-	delay_ms_loop:
-
-	sub r0, r0, 1
-	wait(7990) /* 1millsecond = 1000 microsecond */
-	jumpr delay_ms_loop, 1, GE
-	ret
 
