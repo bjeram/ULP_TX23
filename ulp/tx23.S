@@ -142,7 +142,14 @@ wait_data_start:
 	ret
 
 err_timeout1:
-	move r0, 0x1
+	move r2, 0x1
+	move r0, err
+    st r2, r0, 0
+
+	jump exit_wake 
+
+err_wrong_header:
+	move r2, 0x2
 	move r0, err
     st r2, r0, 0
 
@@ -166,12 +173,16 @@ get_values:
 	/* as we have read the first of 5 bits already in rst_pulse */
 	lsh r2, r2, 1
     or r2, r2, 1 
-	st r2, r0, 0
+	st r2, r0, 0 
 
-	
 /****/	
 	move r0, data_header
     st r2, r0, 0
+
+/* check if header is 0x1b */
+	sub r0, r2, 0x1b
+	jumpr err_wrong_header, 1, GE
+
 	move r0, scratchpad_memory
 /****/
 	add r0, r0, 1
@@ -224,7 +235,7 @@ read_4bits_loop:
 //	move r0, r1 /* put previos value to r0 */
 	psr
 	jump read_wait
-//	move r1, r0
+	move r1, r0
 	pop r0
 
 //	push r1 /* store current (previos) bit value*/
@@ -249,8 +260,7 @@ read_16bits_loop:
 	//move r0, r1
 	psr
 	jump read_wait
-	/* jump read_bit */
-//	move r1, r0
+	move r1, r0
 	pop r0
 
 //	push r1 /* store current (previos) bit value*/
@@ -267,10 +277,8 @@ read_16bits_loop:
 
 /* reads next bit eather value cahnged, or timer (1.2ms) */
 /* R0: (1bit) stores GPIO input on return. */
-/* r0 should contain previos value = bit*/
 /* since R2 is used to store all the bits */
 read_wait:
-
 		stage_rst
 		GPIO_read /* read current value */
 		jumpr wait_for_low, 1, GE /* EQ does not work ??? */
