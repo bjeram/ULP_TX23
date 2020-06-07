@@ -152,18 +152,20 @@ get_values:
 	psr
 	jump rst_pulse
 		
-	wait 4900 /* 600us  to get ot the mid of bit/pulse*/
+	wait 4800 /* 600us  to get to the mid of bit/pulse*/
 	
 	/* 9 bytes from scratchpad memory,*/
 	stage_rst
 	move r0, scratchpad_memory
 
 	push r0
-	move r2, 1 // previous bit is 1 (rst_pulse)
+//	move r2, 1 // previous bit is 1 (rst_pulse)
 	psr
     jump read_4bits
 	pop r0
-	or r2, r2, 0x10 // as we have read the first of 5 bits in rst_pulse
+	/* as we have read the first of 5 bits already in rst_pulse */
+	lsh r2, r2, 1
+    or r2, r2, 1 
 	st r2, r0, 0
 
 	
@@ -175,7 +177,7 @@ get_values:
 	add r0, r0, 1
 /* let's read wind direction and speed (16bits) */
 	push r0
-	move r2, 1 /* previous bit value should be always 1 (11011) for read_16bits*/
+//	move r2, 1 /* previous bit value should be always 1 (11011) for read_16bits*/
 	psr
     jump read_16bits
 	pop r0
@@ -193,9 +195,9 @@ get_values:
 /* CRC */ 
 	push r0
 	// set previos bit from previos value
-	rsh r2, r2, 15
-	and r2, r2, 0x1
-	//move r2, 0 /* for testin/prototyping previos bit value is set to 0 TBC for read_4bits*/
+	//rsh r2, r2, 15
+	//and r2, r2, 0x1
+
 	psr
     jump read_4bits
 	pop r0
@@ -203,11 +205,9 @@ get_values:
 	add r0, r0, 1
 
 /* wind and speed but in different format, but still 16 bits*/
-// not right result as previos value is not set (r1) !!!!
 	push r0
-	rsh r2, r2, 3
-	and r2, r2, 0x1
-//	move r2, 0 /* for testin/prototyping previos bit value is set to 0 TBC */
+//	rsh r2, r2, 3
+//	and r2, r2, 0x1
 	psr
     jump read_16bits
 	pop r0
@@ -215,62 +215,22 @@ get_values:
 	
 	ret 
 
-/* R2: (5bits) read_byte stores in R2 on return. */
-read_5bits:
-	
-	move r2, 0  /* read-out data (bits) */ 
-	move r0, 0  /* bit index */
-	move r1, 0 
-
-	/* in next two stes we are assuming that first read is 1 = bit is 1*/
-	move r2, 1  /* read-out data (bits) */ /* first value is always 1 TBC*/
-	move r0, 1  /* bit index  as first bit is already read*/
-	move r1, 1 /* previos bit value is always 1 TBC */
-	
-
-read_5bits_loop:
-	push r0
-
-	/* put previos value to r0 */
-	move r0, r1
-	psr
-	jump read_wait
-/*	jump read_bit */
-	move r1, r0
-	pop r0
-
-	push r1 /* store current (previos) bit value*/
-	lsh r1, r1, r0
-	or r2, r2, r1
-	pop r1
-
-	/* wait 9750 *//* 1200us */
-	add r0, r0, 1
-	jumpr read_5bits_loop, 5, LT
-
-	ret
-
-/* R2 should containe previos bit version
-(4bits) read_byte stores in R2 on return. */
+/* R2 (4bits) read_byte stores in R2 on return. */
 read_4bits:
-	move r1, r2
-
 	move r2, 0
 	move r0, 0
 read_4bits_loop:
 	push r0
-	/* put previos value to r0 */
-	move r0, r1
+//	move r0, r1 /* put previos value to r0 */
 	psr
 	jump read_wait
-	/* jump read_bit */
-	move r1, r0
+//	move r1, r0
 	pop r0
 
-	push r1 /* store current (previos) bit value*/
+//	push r1 /* store current (previos) bit value*/
 	lsh r1, r1, r0
 	or r2, r2, r1
-	pop r1
+//	pop r1
 
 	/* wait 9750 *//* 1.2ms */
 	add r0, r0, 1
@@ -279,28 +239,24 @@ read_4bits_loop:
 	ret
 
 
-/* R2 should contain previos bit 
-(16bits) read_byte stores in R2 on return. */
+/* R2 (16bits) read_byte stores in R2 on return. */
 read_16bits:
-	move r1, r2 // previos bit to r1
-
 	move r2, 0
 	move r0, 0
-
 read_16bits_loop:
 	push r0
 	/* put previos value to r0 */
-	move r0, r1
+	//move r0, r1
 	psr
 	jump read_wait
 	/* jump read_bit */
-	move r1, r0
+//	move r1, r0
 	pop r0
 
-	push r1 /* store current (previos) bit value*/
+//	push r1 /* store current (previos) bit value*/
 	lsh r1, r1, r0
 	or r2, r2, r1
-	pop r1
+//	pop r1
 
 	/* wait 9750 *//* 1.2ms */
 	add r0, r0, 1
@@ -316,6 +272,7 @@ read_16bits_loop:
 read_wait:
 
 		stage_rst
+		GPIO_read /* read current value */
 		jumpr wait_for_low, 1, GE /* EQ does not work ??? */
 
 wait_for_high:
